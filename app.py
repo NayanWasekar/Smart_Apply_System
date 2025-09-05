@@ -1,31 +1,33 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from config import Config
-from models import db  # imports all models automatically
+from models import db
+from routes import register_routes  # ✅ import the central route registrar
 
+# Extensions
 migrate = Migrate()
+jwt = JWTManager()
+
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Init DB + Migrations
+    # Init extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    jwt.init_app(app)
 
-    # Register routes/blueprints
-    from routes.auth_routes import auth_bp
-    from routes.hr_routes import hr_bp
-    from routes.job_routes import job_bp
-    from routes.application_routes import application_bp
+    # Enable CORS (React dev + prod)
+    CORS(app, resources={r"/*": {"origins": ["http://localhost:3000"]}})
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(hr_bp)
-    app.register_blueprint(job_bp)
-    app.register_blueprint(application_bp)
+    # Register all routes
+    register_routes(app)
 
     return app
+
 
 if __name__ == "__main__":
     app = create_app()
