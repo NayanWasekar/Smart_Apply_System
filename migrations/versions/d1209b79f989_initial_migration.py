@@ -1,8 +1,8 @@
-"""initial schema
+"""Initial migration
 
-Revision ID: 5809b52280f6
+Revision ID: d1209b79f989
 Revises: 
-Create Date: 2025-09-04 15:19:43.715260
+Create Date: 2025-09-05 15:59:52.544935
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '5809b52280f6'
+revision = 'd1209b79f989'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -33,7 +33,7 @@ def upgrade():
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('phone', sa.String(length=50), nullable=True),
-    sa.Column('role', sa.String(length=50), nullable=True),
+    sa.Column('role', sa.Enum('HR', 'ADMIN', name='roleenum'), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('last_login', sa.DateTime(), nullable=True),
@@ -48,17 +48,21 @@ def upgrade():
     sa.Column('location', sa.String(length=255), nullable=True),
     sa.Column('posted_by', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('status', sa.Enum('ACTIVE', 'CLOSED', 'DRAFT', 'ARCHIVED', name='jobstatus'), nullable=False),
     sa.ForeignKeyConstraint(['posted_by'], ['company_employee.employee_id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('job_id')
     )
+    with op.batch_alter_table('job', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_job_location'), ['location'], unique=False)
+        batch_op.create_index(batch_op.f('ix_job_title'), ['title'], unique=False)
+
     op.create_table('application',
     sa.Column('application_id', sa.Integer(), nullable=False),
     sa.Column('job_id', sa.Integer(), nullable=False),
     sa.Column('candidate_id', sa.Integer(), nullable=False),
     sa.Column('applied_at', sa.DateTime(), nullable=True),
     sa.Column('ai_score', sa.Numeric(precision=5, scale=2), nullable=True),
-    sa.Column('status', sa.String(length=50), nullable=True),
+    sa.Column('status', sa.Enum('PENDING', 'REJECTED', 'SHORTLISTED', 'INTERVIEW', 'OFFERED', 'HIRED', name='applicationstatus'), nullable=False),
     sa.ForeignKeyConstraint(['candidate_id'], ['candidate.candidate_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['job_id'], ['job.job_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('application_id')
@@ -66,7 +70,7 @@ def upgrade():
     op.create_table('application_progress',
     sa.Column('progress_id', sa.Integer(), nullable=False),
     sa.Column('application_id', sa.Integer(), nullable=False),
-    sa.Column('status', sa.String(length=50), nullable=False),
+    sa.Column('status', sa.Enum('PENDING', 'REJECTED', 'SHORTLISTED', 'INTERVIEW', 'OFFERED', 'HIRED', name='applicationstatus'), nullable=False),
     sa.Column('updated_by', sa.Integer(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),
@@ -81,7 +85,7 @@ def upgrade():
     sa.Column('subject', sa.String(length=255), nullable=False),
     sa.Column('body', sa.Text(), nullable=False),
     sa.Column('sent_at', sa.DateTime(), nullable=True),
-    sa.Column('type', sa.String(length=50), nullable=True),
+    sa.Column('type', sa.Enum('REJECTION', 'INTERVIEW', 'OFFER', 'CUSTOM', name='emailtype'), nullable=False),
     sa.ForeignKeyConstraint(['application_id'], ['application.application_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('email_id')
     )
@@ -93,6 +97,10 @@ def downgrade():
     op.drop_table('email_log')
     op.drop_table('application_progress')
     op.drop_table('application')
+    with op.batch_alter_table('job', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_job_title'))
+        batch_op.drop_index(batch_op.f('ix_job_location'))
+
     op.drop_table('job')
     op.drop_table('company_employee')
     op.drop_table('candidate')

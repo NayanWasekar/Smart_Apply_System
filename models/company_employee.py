@@ -15,7 +15,7 @@ class CompanyEmployee(db.Model):
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     phone = db.Column(db.String(50))
-    role = db.Column(db.Enum(RoleEnum), default=RoleEnum.HR, nullable=False)  # ✅ enum-based role
+    role = db.Column(db.Enum(RoleEnum), default=RoleEnum.HR, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)

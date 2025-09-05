@@ -19,14 +19,16 @@ class Job(db.Model):
     requirements = db.Column(db.Text)
     location = db.Column(db.String(255), index=True)
 
-    posted_by = db.Column(db.Integer, db.ForeignKey("company_employee.employee_id", ondelete="SET NULL"))
+    posted_by = db.Column(
+        db.Integer,
+        db.ForeignKey("company_employee.employee_id", ondelete="SET NULL")
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     status = db.Column(db.Enum(JobStatus), default=JobStatus.ACTIVE, nullable=False)
 
     # Relationships
     applications = db.relationship("Application", backref="job", lazy=True)
-    posted_by_employee = db.relationship("CompanyEmployee", backref="jobs", lazy=True)
 
     def __repr__(self):
         return f"<Job {self.title} (ID: {self.job_id}, Status: {self.status.value})>"
