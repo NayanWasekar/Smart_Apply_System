@@ -4,35 +4,37 @@ from models.company_employee import CompanyEmployee, RoleEnum
 from models import db, Candidate
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
-
-
+ 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
-
-
+ 
+ 
+# -----------------------------
+# Route: Register Admin (Only once)
+# -----------------------------
 @auth_bp.route("/register-admin", methods=["POST"])
 def register_admin():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Missing request body"}), 400
-
+ 
     name = data.get("name")
     email = data.get("email")
     phone = data.get("phone")
     password = data.get("password")
-
+ 
     if not name or not email or not password:
         return jsonify({"error": "Name, email and password are required"}), 400
-
+ 
     # Prevent multiple admins
     admin_exists = CompanyEmployee.query.filter_by(role=RoleEnum.ADMIN).first()
     if admin_exists:
         return jsonify({"error": "An Admin already exists. Only one Admin can be created this way."}), 403
-
+ 
     if CompanyEmployee.query.filter_by(email=email).first():
         return jsonify({"error": "Email already registered"}), 400
-
+ 
     hashed_pw = generate_password_hash(password)
-
+ 
     new_admin = CompanyEmployee(
         name=name,
         email=email,
@@ -40,10 +42,10 @@ def register_admin():
         role=RoleEnum.ADMIN,
         password_hash=hashed_pw,
     )
-
+ 
     db.session.add(new_admin)
     db.session.commit()
-
+ 
     return jsonify({
         "message": "Admin registered successfully",
         "employee": {
@@ -53,45 +55,47 @@ def register_admin():
             "role": new_admin.role.value,
         }
     }), 201
-
-
-
+ 
+ 
+# -----------------------------
+# Route: Login (Admin / HR / Candidate)
+# -----------------------------
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Missing request body"}), 400
-
+ 
     email = data.get("email")
     password = data.get("password")
     role = data.get("role")  # must be selected manually: "admin", "hr", "candidate"
-
+ 
     if not email or not password or not role:
         return jsonify({"error": "Email, password, and role are required"}), 400
-
+ 
     role = role.lower()
-
     user = None
-
+ 
     if role in ["admin", "hr"]:
         user = CompanyEmployee.query.filter_by(email=email, role=RoleEnum(role)).first()
     elif role == "candidate":
         user = Candidate.query.filter_by(email=email).first()
     else:
         return jsonify({"error": "Invalid role. Choose 'admin', 'hr', or 'candidate'."}), 400
-
+ 
     if not user:
         return jsonify({"error": f"{role.capitalize()} not found"}), 404
-
+ 
     if not check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
-
-    # JWT token
+ 
+    # ✅ FIXED: identity is user_id (string), role in claims
     access_token = create_access_token(
-        identity={"id": user.employee_id if role in ["admin", "hr"] else user.candidate_id, "role": role},
+        identity=str(user.employee_id if role in ["admin", "hr"] else user.candidate_id),
+        additional_claims={"role": role},
         expires_delta=timedelta(hours=12)
     )
-
+ 
     return jsonify({
         "message": f"{role.capitalize()} logged in successfully",
         "access_token": access_token,
@@ -102,3 +106,30 @@ def login():
             "role": role
         }
     }), 200
+
+
+@auth_bp.route("/candidate_register", methods=["POST"])
+def register_candidate():
+    data = request.get_json()
+    name = data.get("name")
+    email = data.get("email")
+    phone = data.get("phone")
+    password = data.get("password")
+
+    if not all([name, email, password]):
+        return jsonify({"error": "Name, email, and password are required"}), 400
+
+    # Check duplicate email
+    if Candidate.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already exists"}), 400
+
+    candidate = Candidate(
+        name=name,
+        email=email,
+        phone=phone,
+        password=generate_password_hash(password)
+    )
+    db.session.add(candidate)
+    db.session.commit()
+
+    return jsonify({"message": "Candidate registered successfully", "candidate_id": candidate.candidate_id}), 201
